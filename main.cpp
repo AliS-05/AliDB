@@ -6,6 +6,8 @@
 #include <cstring>
 #include <unistd.h>
 #include <cstdlib>
+#include <string>
+#define MAXBUFSIZE 4096
 
 int create_socket() {
 	int fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -50,25 +52,37 @@ int accept_client(int fd) {
 	return client_fd;
 }
 
-void handle_client(int client_fd) {
-	char buffer[1025];
-	int n;
-
-	while ((n = read(client_fd, buffer, sizeof(buffer) - 1)) > 0) {
-		buffer[n] = '\0';
+void handle_client(int client_fd, std::string& buffer) {
+	ssize_t n;
+	char tmp[2048];
+	while ((n = read(client_fd, tmp, sizeof(tmp))) > 0) {
+		buffer.append(tmp, n);
 		std::cout << buffer << std::endl;
+	}
+	return;
+}
+
+void parse_command(int sock_fd, std::string &command){
+	
+	if(command.find("PING") != std::string::npos){ //actually if this is located at position 0 evaluates to false
+		write(sock_fd, "PONG\r\n", 7);
 	}
 }
 
 int main() {
-	int sockfd = create_socket();
-	bind_and_listen(sockfd);
+	std::string userCommand;
+	int sock_fd = create_socket();
+	bind_and_listen(sock_fd);
 
-	int client_fd = accept_client(sockfd);
-	handle_client(client_fd);
+	int client_fd = accept_client(sock_fd);
+	handle_client(client_fd, userCommand);
+
+
+	//networking part done. need to parse command from user
+	parse_command(sock_fd, userCommand);
 
 	close(client_fd);
-	close(sockfd);
+	close(sock_fd);
 	return 0;
 }
 

@@ -1,0 +1,14 @@
+Ah, building your own Redis clone! That sounds ambitious but quite exciting. Let's break down those initial steps from what you've mentioned: sockets, commands, and the interaction between them.
+
+First, let’s clarify what you mean by "socket - commands - commands." Are you thinking about setting up a socket to receive client requests and then handling these requests with specific command functions? If so, how do you envision the flow of data and control moving through your system?
+
+To get started:
+1. **Sockets**: You’ll need to establish communication channels between your Redis clone server and clients. This involves setting up TCP/IP sockets for listening and accepting connections.
+2. **Commands**: Once you have a connection established, how do you plan to interpret incoming commands? Do you want to support all of Redis’s commands from the start or just a subset?
+
+Let's focus on one small part at a time:
+- Can you outline what your initial set of commands might look like?
+- How would a client send a command and receive data back in response?
+
+Think through these steps and see if you can articulate the basic interaction between your server and a client. This will help us move forward with more specific details!
+
