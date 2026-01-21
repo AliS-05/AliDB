@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include <cstdlib>
 int main(){
-	char buffer[1024];
+	char buffer[1025];
 	int sockfd, bind_code, listen_code;
 	struct sockaddr_in serv_addr, client_addr;
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -16,6 +16,9 @@ int main(){
 		std::perror("Error opening socket");
 		std::exit(EXIT_FAILURE);
 	}
+
+	int opt = 1;
+	setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
 	std::memset(&serv_addr, 0, sizeof(serv_addr));
 	serv_addr.sin_family = AF_INET; //IPv4 address family
@@ -31,10 +34,16 @@ int main(){
 		std::perror("Error listening");
 		std::exit(EXIT_FAILURE);
 	}
+
 	socklen_t client_size = sizeof(client_addr); 
 	int client_fd = accept(sockfd, (struct sockaddr*) &client_addr, &client_size);
+	if(client_fd < 0){
+		std::perror("Error accepting");
+		std::exit(EXIT_FAILURE);
+	}
 	int n;
-	while((n = read(client_fd, &buffer, sizeof(buffer))) > 0){
+
+	while((n = read(client_fd, buffer, sizeof(buffer)-1)) > 0){
 		buffer[n] = '\0';
 		std::cout << buffer << std::endl;
 	}
