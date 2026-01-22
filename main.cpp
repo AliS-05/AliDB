@@ -1,3 +1,4 @@
+#include "dataStructures.hpp"
 #include <iostream>
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -6,7 +7,7 @@
 #include <cstring>
 #include <unistd.h>
 #include <cstdlib>
-#include <string>
+#include <memory>
 #define MAXBUFSIZE 4096
 
 int create_socket() {
@@ -55,17 +56,28 @@ int accept_client(int fd) {
 void handle_client(int client_fd, std::string& buffer) {
 	ssize_t n;
 	char tmp[2048];
-	while ((n = read(client_fd, tmp, sizeof(tmp))) > 0) {
-		buffer.append(tmp, n);
-		std::cout << buffer << std::endl;
-	}
+	n = read(client_fd, tmp, sizeof(tmp));
+	buffer.append(tmp, n);
+	std::cout << buffer << std::endl;
 	return;
 }
 
-void parse_command(int sock_fd, std::string &command){
+void handleSet(std::string &userCommand){
+	auto newObj = std::make_unique<ValueObject>(ValueType::STRING);
+	newObj->str = userCommand.substr(4,userCommand.find("\r\n"));
+}
+
+void parse_userCommand(int client_fd, std::string &userCommand){
 	
-	if(command.find("PING") != std::string::npos){ //actually if this is located at position 0 evaluates to false
-		write(sock_fd, "PONG\r\n", 7);
+	if((userCommand.substr(0,5)) == "PING\r\n"){ //actually if this is located at position 0 evaluates to false
+		write(client_fd, "PONG\r\n", 6);
+	}if((userCommand.substr(0,4)) == "SET\r\n"){
+		//handleSet(userCommand);
+		write(client_fd, "SET Received", 13);
+	}
+	else{
+		std::cout << "Text Received: " + userCommand << std::endl;
+		write(client_fd, "DONG", 4);
 	}
 }
 
@@ -73,14 +85,13 @@ int main() {
 	std::string userCommand;
 	int sock_fd = create_socket();
 	bind_and_listen(sock_fd);
-
 	int client_fd = accept_client(sock_fd);
-	handle_client(client_fd, userCommand);
-
-
-	//networking part done. need to parse command from user
-	parse_command(sock_fd, userCommand);
-
+	while(userCommand != "EXIT\r\n"){
+		userCommand.clear();
+		handle_client(client_fd, userCommand);
+		//networking part done. need to parse command from user
+		parse_userCommand(client_fd, userCommand);
+	}
 	close(client_fd);
 	close(sock_fd);
 	return 0;
