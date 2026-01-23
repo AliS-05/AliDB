@@ -10,6 +10,8 @@
 #include <memory>
 #define MAXBUFSIZE 4096
 
+std::vector<ValueObject> storageVector;
+
 int create_socket() {
 	int fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (fd < 0) {
@@ -62,23 +64,42 @@ void handle_client(int client_fd, std::string& buffer) {
 	return;
 }
 
-void handleSet(std::string &userCommand){
+std::unique_ptr<ValueObject> handleSet(std::string &userCommand){
+	//SET\r\nmykey\r\n"Hello, Redis!"\r\n
 	auto newObj = std::make_unique<ValueObject>(ValueType::STRING);
-	newObj->str = userCommand.substr(4,userCommand.find("\r\n"));
+
+	size_t firstCRLF = userCommand.find("\r\n"); //first \r\n
+	if(firstCRLF == std::string::npos) return nullptr;
+
+	size_t secondCRLF = userCommand.find("\r\n", firstCRLF); 
+	//skips SET\r\n, then from \n to 
+	newObj->keyStr = userCommand.substr(firstCRLF + 2, secondCRLF - (firstCRLF + 2));
+	
+	size_t thirdCRLF = userCommand.find("\r\n", secondCRLF + 2);
+	if(thirdCRLF == std::string::npos){
+		newObj->valueStr = userCommand.substr(secondCRLF + 2);
+	} else{
+		newObj->valueStr = userCommand.substr(secondCRLF + 2, thirdCRLF - (secondCRLF + 2));
+	}
+
+	return newObj;
 }
 
-void parse_userCommand(int client_fd, std::string &userCommand){
+std::unique_ptr<ValueObject> parse_userCommand(int client_fd, std::string &userCommand){
 	
-	if((userCommand.substr(0,5)) == "PING\r\n"){ //actually if this is located at position 0 evaluates to false
+	if((userCommand.substr(0,6)) == "PING\r\n"){ 
 		write(client_fd, "PONG\r\n", 6);
-	}if((userCommand.substr(0,4)) == "SET\r\n"){
+	}if((userCommand.substr(0,5)) == "SET\r\n"){
 		//handleSet(userCommand);
 		write(client_fd, "SET Received", 13);
+		return handleSet(userCommand);
 	}
 	else{
 		std::cout << "Text Received: " + userCommand << std::endl;
 		write(client_fd, "DONG", 4);
+		return nullptr;
 	}
+	return nullptr;
 }
 
 int main() {
@@ -90,7 +111,8 @@ int main() {
 		userCommand.clear();
 		handle_client(client_fd, userCommand);
 		//networking part done. need to parse command from user
-		parse_userCommand(client_fd, userCommand);
+		std::unique_ptr<ValueObject> userObject = parse_userCommand(client_fd, userCommand);
+		std::cout << userObject->keyStr << std::endl;
 	}
 	close(client_fd);
 	close(sock_fd);

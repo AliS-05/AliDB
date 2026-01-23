@@ -12,10 +12,18 @@ enum class ValueType{
 class ValueObject{ //class or struct ? 
 	//i think we probably are going to want to have innate functions
 	public:
+		//SET mykey "Hello, Redis!"
+		// command can be handled by server, object needs key and Value
+		
+		//this might be useless actually
 		ValueType type;
-		std::string str;
+		//keys
+		std::string keyStr;
 		std::vector<std::string> list;
 		std::unordered_set<std::string> set;
+		//values
+		std::string valueStr;
+		
 				//syntax for enum classes
 		ValueObject() : type(ValueType::STRING) {}
 		ValueObject(ValueType t) : type(t) {}

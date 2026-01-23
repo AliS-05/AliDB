@@ -43,7 +43,7 @@ int main() {
             std::getline(std::cin, key);
             std::cout << "Enter value: ";
             std::getline(std::cin, value);
-            command = "SET\r\n" + key + " " + value;
+            command = "SET\r\n" + key + "\r\n" + value + "\r\n";
         } else if (choice == 3) {
             std::cout << "Enter text to send: ";
             std::getline(std::cin, command);
