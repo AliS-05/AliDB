@@ -3,6 +3,14 @@
 #include <unordered_set>
 #pragma once
 
+enum class Method{
+	M_PING,
+	M_SET,
+	M_GET,
+	M_DEL,
+	M_UNKNOWN
+};
+
 enum class ValueType{
 	STRING, //encompass integers floats and booleans (basically just straight bits)
 	LIST,

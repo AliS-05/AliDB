@@ -10,7 +10,16 @@
 #include <memory>
 #define MAXBUFSIZE 4096
 
-std::vector<ValueObject> storageVector;
+std::vector<std::unique_ptr<ValueObject>> storageVector;
+
+auto searchVector(std::string &Key){
+	for(const auto& obj : storageVector){
+		if(obj->keyStr == Key){
+			return obj->valueStr;
+		}
+	}
+	return std::string{};
+}
 
 int create_socket() {
 	int fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -64,42 +73,93 @@ void handle_client(int client_fd, std::string& buffer) {
 	return;
 }
 
-std::unique_ptr<ValueObject> handleSet(std::string &userCommand){
+void handleSet(std::string &userCommand){
 	//SET\r\nmykey\r\n"Hello, Redis!"\r\n
 	auto newObj = std::make_unique<ValueObject>(ValueType::STRING);
 
-	size_t firstCRLF = userCommand.find("\r\n"); //first \r\n
-	if(firstCRLF == std::string::npos) return nullptr;
+	std::vector<std::string> parts;
+	size_t start = 0;
+	size_t end = userCommand.find("\r\n");
 
-	size_t secondCRLF = userCommand.find("\r\n", firstCRLF); 
-	//skips SET\r\n, then from \n to 
-	newObj->keyStr = userCommand.substr(firstCRLF + 2, secondCRLF - (firstCRLF + 2));
-	
-	size_t thirdCRLF = userCommand.find("\r\n", secondCRLF + 2);
-	if(thirdCRLF == std::string::npos){
-		newObj->valueStr = userCommand.substr(secondCRLF + 2);
-	} else{
-		newObj->valueStr = userCommand.substr(secondCRLF + 2, thirdCRLF - (secondCRLF + 2));
+	// Split the command into parts based on \r\n
+	while (end != std::string::npos) {
+		parts.push_back(userCommand.substr(start, end - start));
+		start = end + 2; // Skip the \r\n
+		end = userCommand.find("\r\n", start);
 	}
 
-	return newObj;
+	// Now parts[0] is "SET"
+	// parts[1] is the Key
+	// parts[2] is the Value
+	if (parts.size() >= 3) {
+		newObj->keyStr = parts[1];
+		newObj->valueStr = parts[2];
+		storageVector.push_back(std::move(newObj)); // adds to the end of vector
+		std::cout << "Successfully stored key: " << storageVector.back()->keyStr << std::endl;
+	}
 }
 
-std::unique_ptr<ValueObject> parse_userCommand(int client_fd, std::string &userCommand){
-	
-	if((userCommand.substr(0,6)) == "PING\r\n"){ 
-		write(client_fd, "PONG\r\n", 6);
-	}if((userCommand.substr(0,5)) == "SET\r\n"){
-		//handleSet(userCommand);
-		write(client_fd, "SET Received", 13);
-		return handleSet(userCommand);
+std::string handleGet(std::string &userCommand){
+	// GET\r\nALI\r\n
+	size_t firstCRLF = userCommand.find("\r\n");
+	if(firstCRLF == std::string::npos) return userCommand;
+	size_t secondCRLF = userCommand.find("\r\n", firstCRLF + 2);
+
+	auto keyToFind = userCommand.substr(firstCRLF + 2, secondCRLF - (firstCRLF + 2)); // KEY
+	// DEBUG: See the key with literal characters
+	std::cout << "Searching for key: [";
+	for(char c : keyToFind) {
+	if(c == '\r') std::cout << "\\r";
+	else if(c == '\n') std::cout << "\\n";
+	else std::cout << c;
 	}
-	else{
-		std::cout << "Text Received: " + userCommand << std::endl;
-		write(client_fd, "DONG", 4);
-		return nullptr;
+	std::cout << "]" << std::endl;
+	auto valueOfKey = searchVector(keyToFind);
+	std::cout << valueOfKey << std::endl;
+	return valueOfKey;
+}
+
+Method parseMethod(const std::string &userCommand){
+	auto firstCRLF = userCommand.find("\r\n");
+	auto command = userCommand.substr(0, firstCRLF);
+	if (command == "PING") return Method::M_PING;
+	if (command == "SET") return Method::M_SET;
+	if (command == "GET") return Method::M_GET;
+	if (command == "DEL") return Method::M_DEL;
+	return Method::M_UNKNOWN;
+} 	
+
+//std::unique_ptr<ValueObject>
+void parseUserCommand(int client_fd, std::string &userCommand){ //checks for mehthod user requested
+	Method commandMethod = parseMethod(userCommand);
+	// key and value getter function ?
+	switch(commandMethod){
+		case Method::M_PING:
+			write(client_fd, "PONG\r\n", 6);
+			break;
+		case Method::M_SET:
+			write(client_fd, "SET Received\r\n", 13);
+			handleSet(userCommand);
+			break;
+		case Method::M_GET: {
+			auto key = handleGet(userCommand);
+			if(key.empty()){
+				write(client_fd, "KEY NOT FOUND\r\n", 14);
+			}else{
+				write(client_fd, key.data(), key.size());
+				write(client_fd, "\r\n", 2);
+			}
+			break;
+		}
+
+		case Method::M_DEL:
+			//TODO
+			break;
+		default:
+			std::cout << "Text Received: " + userCommand << std::endl;
+			write(client_fd, "Not sure", 4);
+			break;
 	}
-	return nullptr;
 }
 
 int main() {
@@ -111,8 +171,8 @@ int main() {
 		userCommand.clear();
 		handle_client(client_fd, userCommand);
 		//networking part done. need to parse command from user
-		std::unique_ptr<ValueObject> userObject = parse_userCommand(client_fd, userCommand);
-		std::cout << userObject->keyStr << std::endl;
+		//std::unique_ptr<ValueObject> userObject = 
+		parseUserCommand(client_fd, userCommand);
 	}
 	close(client_fd);
 	close(sock_fd);

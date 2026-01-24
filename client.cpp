@@ -25,8 +25,9 @@ int main() {
         std::cout << "\nSelect a command:\n";
         std::cout << "1) PING\n";
         std::cout << "2) SET\n";
-        std::cout << "3) Send custom text\n";
-        std::cout << "4) Quit\n";
+        std::cout << "3) GET\n";
+        std::cout << "4) Send custom text\n";
+        std::cout << "5) Quit\n";
         std::cout << "Enter choice: ";
 
         int choice;
@@ -45,11 +46,16 @@ int main() {
             std::getline(std::cin, value);
             command = "SET\r\n" + key + "\r\n" + value + "\r\n";
         } else if (choice == 3) {
+            std::string key;
+            std::cout << "Enter key you want to get ";
+            std::getline(std::cin, key);
+            command = "GET\r\n" + key + "\r\n";
+        } else if (choice == 4) {
             std::cout << "Enter text to send: ";
             std::getline(std::cin, command);
-        } else if (choice == 4) {
+        } else if (choice == 5) {
             std::cout << "Exiting...\n";
-	    send(sock, "EXIT\r\n", 6, 0);
+            send(sock, "EXIT\r\n", 6, 0);
             break;
         } else {
             std::cout << "Invalid choice.\n";
@@ -70,10 +76,7 @@ int main() {
             break;
         }
     }
-	
-	
 
     close(sock);
     return 0;
 }
-
