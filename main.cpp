@@ -8,17 +8,28 @@
 #include <unistd.h>
 #include <cstdlib>
 #include <memory>
+#include <algorithm>
 #define MAXBUFSIZE 4096
 
 std::vector<std::unique_ptr<ValueObject>> storageVector;
 
 auto searchVector(std::string &Key){
+	return std::find_if(
+			storageVector.begin(),
+			storageVector.end(),
+			[&](const std::unique_ptr<ValueObject>& obj){
+			return obj->keyStr == Key;
+			}
+		);
+}
+
+bool checkExists(std::string &Key){
 	for(const auto& obj : storageVector){
 		if(obj->keyStr == Key){
-			return obj->valueStr;
+			return true;
 		}
 	}
-	return std::string{};
+	return false;
 }
 
 int create_socket() {
@@ -106,17 +117,30 @@ std::string handleGet(std::string &userCommand){
 	size_t secondCRLF = userCommand.find("\r\n", firstCRLF + 2);
 
 	auto keyToFind = userCommand.substr(firstCRLF + 2, secondCRLF - (firstCRLF + 2)); // KEY
-	// DEBUG: See the key with literal characters
-	std::cout << "Searching for key: [";
-	for(char c : keyToFind) {
-	if(c == '\r') std::cout << "\\r";
-	else if(c == '\n') std::cout << "\\n";
-	else std::cout << c;
-	}
-	std::cout << "]" << std::endl;
+
 	auto valueOfKey = searchVector(keyToFind);
-	std::cout << valueOfKey << std::endl;
-	return valueOfKey;
+	if(valueOfKey == storageVector.end()){
+		return {};
+	}
+	return (*valueOfKey)->valueStr;
+}
+
+Code handleDel(std::string &userCommand){
+	size_t firstCRLF = userCommand.find("\r\n");
+	if(firstCRLF == std::string::npos) return Code::ERROR;
+
+	size_t secondCRLF = userCommand.find("\r\n", firstCRLF + 2);
+	if(secondCRLF == std::string::npos)return Code::ERROR;
+
+	std::string delObj  = userCommand.substr(firstCRLF + 2, secondCRLF - (firstCRLF + 2)); // KEY
+
+	auto it = searchVector(delObj);
+
+	if(it == storageVector.end()){
+		return Code::ERROR;
+	}
+	storageVector.erase(it);
+	return Code::SUCCESS;
 }
 
 Method parseMethod(const std::string &userCommand){
@@ -153,7 +177,12 @@ void parseUserCommand(int client_fd, std::string &userCommand){ //checks for meh
 		}
 
 		case Method::M_DEL:
-			//TODO
+			std::cout << "Looking for deleted key.." << std::endl;
+			if(handleDel(userCommand) == Code::SUCCESS){
+				write(client_fd, "KEY DELETED\r\n", 13);
+			} else{
+				write(client_fd, "KEY NOT FOUND\r\n", 14);
+			}
 			break;
 		default:
 			std::cout << "Text Received: " + userCommand << std::endl;

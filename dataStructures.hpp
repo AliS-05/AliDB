@@ -3,6 +3,12 @@
 #include <unordered_set>
 #pragma once
 
+enum class Code{
+	SUCCESS,
+	ERROR,
+	UNKNOWN
+};
+
 enum class Method{
 	M_PING,
 	M_SET,

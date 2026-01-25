@@ -26,8 +26,9 @@ int main() {
         std::cout << "1) PING\n";
         std::cout << "2) SET\n";
         std::cout << "3) GET\n";
-        std::cout << "4) Send custom text\n";
-        std::cout << "5) Quit\n";
+	std::cout << "4) DEL\n";
+        std::cout << "5) Send custom text\n";
+        std::cout << "6) Quit\n";
         std::cout << "Enter choice: ";
 
         int choice;
@@ -50,10 +51,15 @@ int main() {
             std::cout << "Enter key you want to get ";
             std::getline(std::cin, key);
             command = "GET\r\n" + key + "\r\n";
-        } else if (choice == 4) {
+	} else if(choice == 4){
+	    std::string key;
+	    std::cout << "Enter key you want to delete ";
+	    std::getline(std::cin, key);
+	    command = "DEL\r\n" + key + "\r\n";
+        } else if (choice == 5) {
             std::cout << "Enter text to send: ";
             std::getline(std::cin, command);
-        } else if (choice == 5) {
+        } else if (choice == 6) {
             std::cout << "Exiting...\n";
             send(sock, "EXIT\r\n", 6, 0);
             break;
