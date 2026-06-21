@@ -1,6 +1,7 @@
 #include <string>
 #include <vector>
 #include <unordered_set>
+#include <variant>
 #pragma once
 
 enum class Code{
@@ -32,12 +33,10 @@ class ValueObject{ //class or struct ?
 		//this might be useless actually
 		ValueType type;
 		//keys
-		std::string keyStr;
 		std::vector<std::string> list;
 		std::unordered_set<std::string> set;
 		//values
 		std::string valueStr;
-		
 				//syntax for enum classes
 		ValueObject() : type(ValueType::STRING) {}
 		ValueObject(ValueType t) : type(t) {}

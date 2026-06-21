@@ -9,28 +9,11 @@
 #include <cstdlib>
 #include <memory>
 #include <algorithm>
+#include <optional>
+#include <unordered_map>
+
 #define MAXBUFSIZE 4096
-
-std::vector<std::unique_ptr<ValueObject>> storageVector;
-
-auto searchVector(std::string &Key){
-	return std::find_if(
-			storageVector.begin(),
-			storageVector.end(),
-			[&](const std::unique_ptr<ValueObject>& obj){
-			return obj->keyStr == Key;
-			}
-		);
-}
-
-bool checkExists(std::string &Key){
-	for(const auto& obj : storageVector){
-		if(obj->keyStr == Key){
-			return true;
-		}
-	}
-	return false;
-}
+std::unordered_map<std::string, std::unique_ptr<ValueObject>> storageMap;
 
 int create_socket() {
 	int fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -84,8 +67,18 @@ void handle_client(int client_fd, std::string& buffer) {
 	return;
 }
 
+
+bool checkExists(const std::string &Key){
+	auto iter = storageMap.find(Key);
+	if (iter == storageMap.end()){
+		return false;
+	}
+	return true;
+}
+
+
 void handleSet(std::string &userCommand){
-	//SET\r\nmykey\r\n"Hello, Redis!"\r\n
+	//SET\r\nMyKey\r\n"Hello, World!"\r\n
 	auto newObj = std::make_unique<ValueObject>(ValueType::STRING);
 
 	std::vector<std::string> parts;
@@ -103,29 +96,33 @@ void handleSet(std::string &userCommand){
 	// parts[1] is the Key
 	// parts[2] is the Value
 	if (parts.size() >= 3) {
-		newObj->keyStr = parts[1];
 		newObj->valueStr = parts[2];
-		storageVector.push_back(std::move(newObj)); // adds to the end of vector
-		std::cout << "Successfully stored key: " << storageVector.back()->keyStr << std::endl;
+		storageMap.try_emplace(parts[1], std::move(newObj));
+		std::cout << "Successfully stored key: " << parts[1] << "with value: " << parts[2] << std::endl;
 	}
 }
 
-std::string handleGet(std::string &userCommand){
+auto searchMap(const std::string &Key){
+	return storageMap.find(Key);
+}
+
+std::optional<std::string> handleGet(std::string &userCommand){
 	// GET\r\nALI\r\n
 	size_t firstCRLF = userCommand.find("\r\n");
-	if(firstCRLF == std::string::npos) return userCommand;
+	if(firstCRLF == std::string::npos) return std::nullopt;
 	size_t secondCRLF = userCommand.find("\r\n", firstCRLF + 2);
 
 	auto keyToFind = userCommand.substr(firstCRLF + 2, secondCRLF - (firstCRLF + 2)); // KEY
 
-	auto valueOfKey = searchVector(keyToFind);
-	if(valueOfKey == storageVector.end()){
-		return {};
+	auto valueOfKey = searchMap(keyToFind);
+	if(valueOfKey == storageMap.end()){
+		return std::nullopt;
 	}
-	return (*valueOfKey)->valueStr;
+	//dereference iterators to unique_ptr
+	return valueOfKey->second->valueStr;
 }
 
-Code handleDel(std::string &userCommand){
+Code handleDel(const std::string &userCommand){
 	size_t firstCRLF = userCommand.find("\r\n");
 	if(firstCRLF == std::string::npos) return Code::ERROR;
 
@@ -134,12 +131,12 @@ Code handleDel(std::string &userCommand){
 
 	std::string delObj  = userCommand.substr(firstCRLF + 2, secondCRLF - (firstCRLF + 2)); // KEY
 
-	auto it = searchVector(delObj);
+	auto it = searchMap(delObj);
 
-	if(it == storageVector.end()){
+	if(it == storageMap.end()){
 		return Code::ERROR;
 	}
-	storageVector.erase(it);
+	storageMap.erase(it);
 	return Code::SUCCESS;
 }
 
@@ -156,7 +153,6 @@ Method parseMethod(const std::string &userCommand){
 //std::unique_ptr<ValueObject>
 void parseUserCommand(int client_fd, std::string &userCommand){ //checks for mehthod user requested
 	Method commandMethod = parseMethod(userCommand);
-	// key and value getter function ?
 	switch(commandMethod){
 		case Method::M_PING:
 			write(client_fd, "PONG\r\n", 6);
@@ -166,16 +162,15 @@ void parseUserCommand(int client_fd, std::string &userCommand){ //checks for meh
 			handleSet(userCommand);
 			break;
 		case Method::M_GET: {
-			auto key = handleGet(userCommand);
-			if(key.empty()){
+			auto val = handleGet(userCommand);
+			if(!val){
 				write(client_fd, "KEY NOT FOUND\r\n", 14);
 			}else{
-				write(client_fd, key.data(), key.size());
+				write(client_fd, val->data(), val->size());
 				write(client_fd, "\r\n", 2);
 			}
 			break;
 		}
-
 		case Method::M_DEL:
 			std::cout << "Looking for deleted key.." << std::endl;
 			if(handleDel(userCommand) == Code::SUCCESS){
@@ -186,7 +181,7 @@ void parseUserCommand(int client_fd, std::string &userCommand){ //checks for meh
 			break;
 		default:
 			std::cout << "Text Received: " + userCommand << std::endl;
-			write(client_fd, "Not sure", 4);
+			write(client_fd, "Not sure", strlen("Not sure"));
 			break;
 	}
 }
