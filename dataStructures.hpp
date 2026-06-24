@@ -15,6 +15,7 @@ enum class Method{
 	M_SET,
 	M_GET,
 	M_DEL,
+	M_CHECK,
 	M_UNKNOWN
 };
 

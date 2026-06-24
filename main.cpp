@@ -97,7 +97,7 @@ void handleSet(std::string &userCommand){
 	// parts[2] is the Value
 	if (parts.size() >= 3) {
 		newObj->valueStr = parts[2];
-		storageMap.try_emplace(parts[1], std::move(newObj));
+		storageMap[parts[1]] = std::move(newObj);
 		std::cout << "Successfully stored key: " << parts[1] << "with value: " << parts[2] << std::endl;
 	}
 }
@@ -130,7 +130,7 @@ Code handleDel(const std::string &userCommand){
 	if(secondCRLF == std::string::npos)return Code::ERROR;
 
 	std::string delObj  = userCommand.substr(firstCRLF + 2, secondCRLF - (firstCRLF + 2)); // KEY
-
+	
 	auto it = searchMap(delObj);
 
 	if(it == storageMap.end()){
@@ -147,8 +147,18 @@ Method parseMethod(const std::string &userCommand){
 	if (command == "SET") return Method::M_SET;
 	if (command == "GET") return Method::M_GET;
 	if (command == "DEL") return Method::M_DEL;
+	if (command == "CHECK") return Method::M_CHECK;
 	return Method::M_UNKNOWN;
 } 	
+
+std::string extractKey(std::string &userCommand){
+	size_t firstCRLF = userCommand.find("\r\n");
+	if(firstCRLF == std::string::npos) return std::string("Error");
+	size_t secondCRLF = userCommand.find("\r\n", firstCRLF + 2);
+	if(secondCRLF == std::string::npos)return std::string("Error");
+	std::string key = userCommand.substr(firstCRLF + 2, secondCRLF - (firstCRLF + 2)); // KEY
+	return key;
+}
 
 //std::unique_ptr<ValueObject>
 void parseUserCommand(int client_fd, std::string &userCommand){ //checks for mehthod user requested
@@ -177,6 +187,13 @@ void parseUserCommand(int client_fd, std::string &userCommand){ //checks for meh
 				write(client_fd, "KEY DELETED\r\n", 13);
 			} else{
 				write(client_fd, "KEY NOT FOUND\r\n", 14);
+			}
+			break;
+		case Method::M_CHECK:
+			if(checkExists(extractKey(userCommand))){
+					write(client_fd, "TRUE\r\n", strlen("TRUE\r\n"));
+			} else {
+				write(client_fd, "FALSE\r\n", strlen("FALSE\r\n"));
 			}
 			break;
 		default:
