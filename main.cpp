@@ -11,7 +11,7 @@
 #include <algorithm>
 #include <optional>
 #include <unordered_map>
-
+#include <cctype>
 #define MAXBUFSIZE 4096
 std::unordered_map<std::string, std::unique_ptr<ValueObject>> storageMap;
 
@@ -67,6 +67,16 @@ void handle_client(int client_fd, std::string& buffer) {
 	return;
 }
 
+std::string extractKey(const std::string &userCommand){
+	size_t firstCRLF = userCommand.find("\r\n");
+	if(firstCRLF == std::string::npos) return std::string("Error");
+
+	size_t secondCRLF = userCommand.find("\r\n", firstCRLF + 2);
+	if(secondCRLF == std::string::npos) return std::string("Error");
+
+	std::string key = userCommand.substr(firstCRLF + 2, secondCRLF - (firstCRLF + 2));
+	return key;
+}
 
 bool checkExists(const std::string &Key){
 	auto iter = storageMap.find(Key);
@@ -140,25 +150,52 @@ Code handleDel(const std::string &userCommand){
 	return Code::SUCCESS;
 }
 
+Code handleIncrement(const std::string &userCommand){
+	auto key = extractKey(userCommand);
+	std::cout << key << std::endl;
+	auto val = searchMap(key);
+	std::cout << val->second->valueStr << std::endl;
+	for(auto d : val->second->valueStr){
+		if(!isdigit(static_cast<unsigned char>(d)))
+			return Code::ERROR;
+	}
+	auto res = std::stoi(val->second->valueStr);
+	res++;
+	std::cout << res << std::endl;
+	val->second->valueStr = std::to_string(res);
+	return Code::SUCCESS;
+}
+
+Code handleDecrement(const std::string &userCommand){
+	auto key = extractKey(userCommand);
+	auto val = searchMap(key);
+	for(auto d : val->second->valueStr){
+		if(!isdigit(static_cast<unsigned char>(d)))
+			return Code::ERROR;
+	}
+	auto res = std::stoi(val->second->valueStr);
+	res--;
+	val->second->valueStr = std::to_string(res);
+	return Code::SUCCESS;
+}
+
 Method parseMethod(const std::string &userCommand){
 	auto firstCRLF = userCommand.find("\r\n");
 	auto command = userCommand.substr(0, firstCRLF);
+	for (auto& c : command)
+		c = std::toupper(static_cast<unsigned char>(c));
+
 	if (command == "PING") return Method::M_PING;
 	if (command == "SET") return Method::M_SET;
 	if (command == "GET") return Method::M_GET;
 	if (command == "DEL") return Method::M_DEL;
 	if (command == "CHECK") return Method::M_CHECK;
+	if (command == "INCR") return Method::M_INCR;
+	if (command == "DECR") return Method::M_DECR;
 	return Method::M_UNKNOWN;
 } 	
 
-std::string extractKey(std::string &userCommand){
-	size_t firstCRLF = userCommand.find("\r\n");
-	if(firstCRLF == std::string::npos) return std::string("Error");
-	size_t secondCRLF = userCommand.find("\r\n", firstCRLF + 2);
-	if(secondCRLF == std::string::npos)return std::string("Error");
-	std::string key = userCommand.substr(firstCRLF + 2, secondCRLF - (firstCRLF + 2)); // KEY
-	return key;
-}
+
 
 //std::unique_ptr<ValueObject>
 void parseUserCommand(int client_fd, std::string &userCommand){ //checks for mehthod user requested
@@ -194,6 +231,20 @@ void parseUserCommand(int client_fd, std::string &userCommand){ //checks for meh
 					write(client_fd, "TRUE\r\n", strlen("TRUE\r\n"));
 			} else {
 				write(client_fd, "FALSE\r\n", strlen("FALSE\r\n"));
+			}
+			break;
+		case Method::M_INCR:
+			if(handleIncrement(userCommand) == Code::SUCCESS){
+				write(client_fd, "Value Incremented", strlen("Value Incremented"));
+			} else {
+				write(client_fd, "Error Incrementing", strlen("Error Incrementing"));
+			}
+			break;
+		case Method::M_DECR:
+			if(handleDecrement(userCommand) == Code::SUCCESS){
+				write(client_fd, "Value Decremented", strlen("Value Decrementing"));
+			} else {
+				write(client_fd, "Error Decrementing", strlen("Error Decrementing"));
 			}
 			break;
 		default:

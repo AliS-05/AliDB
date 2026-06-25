@@ -2,7 +2,7 @@
 #include <cstring>
 #include <unistd.h>
 #include <arpa/inet.h>
-
+#include <sstream>
 int main() {
 	int sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (sock < 0) {
@@ -21,59 +21,32 @@ int main() {
 	}
 
 	while (true) {
-		std::cout << "\nSelect a command:\n";
-		std::cout << "1) PING\n";
-		std::cout << "2) SET\n";
-		std::cout << "3) GET\n";
-		std::cout << "4) DEL\n";
-		std::cout << "5) CHECK_EXISTS\n";
-		std::cout << "6) Send custom text\n";
-		std::cout << "7) Quit\n";
-		std::cout << "Enter choice: ";
+		std::string full, command, key, value;
+		std::cout << "Enter command with syntax COMMAND Key [Value]\n";
+		std::getline(std::cin, full);
+		
+		std::stringstream ss(full);
 
-		int choice;
-		std::cin >> choice;
-		std::cin.ignore(); // discard leftover newline
+		if(!std::getline(ss, command, ' ')) continue;
+		std::getline(ss, key, ' ');
+		std::getline(ss, value);
 
-		std::string command;
+		std::cout << "command = " << command << '\n';
+		std::cout << "key     = " << key << '\n';
+		std::cout << "value   = " << value << '\n';
+		
+		command.append("\r\n");
+		if(key.size() >0){
+			command.append(key);
+			command.append("\r\n");
+		}
 
-		if (choice == 1) {
-			command = "PING\r\n";
-		} else if (choice == 2) {
-			std::string key, value;
-			std::cout << "Enter key: ";
-			std::getline(std::cin, key);
-			std::cout << "Enter value: ";
-			std::getline(std::cin, value);
-			command = "SET\r\n" + key + "\r\n" + value + "\r\n";
-		} else if (choice == 3) {
-			std::string key;
-			std::cout << "Enter key you want to get ";
-			std::getline(std::cin, key);
-			command = "GET\r\n" + key + "\r\n";
-		} else if(choice == 4){
-			std::string key;
-			std::cout << "Enter key you want to delete ";
-			std::getline(std::cin, key);
-			command = "DEL\r\n" + key + "\r\n";
-		} else if(choice == 5){
-			std::string key;
-			std::getline(std::cin, key);
-			command = "CHECK\r\n" + key + "\r\n";
-		} else if (choice == 6) {
-			std::cout << "Enter text to send: ";
-			std::getline(std::cin, command);
-		} else if (choice == 7) {
-			std::cout << "Exiting...\n";
-			send(sock, "EXIT\r\n", 6, 0);
-			break;
-		} else {
-			std::cout << "Invalid choice.\n";
-			continue;
+		if(value.size() > 0){
+			command.append(value);
+			command.append("\r\n");
 		}
 
 		send(sock, command.c_str(), command.size(), 0);
-
 		char buf[1024];
 		int n = recv(sock, buf, sizeof(buf) - 1, 0);
 		if (n > 0) {
