@@ -1,3 +1,5 @@
+#include <string>
+#include "network.hpp"
 #include "dataStructures.hpp"
 #include <iostream>
 #include <stdlib.h>
@@ -16,57 +18,6 @@
 #define MAXBUFSIZE 4096
 std::unordered_map<std::string, std::unique_ptr<ValueObject>> storageMap;
 
-int create_socket() {
-	int fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (fd < 0) {
-		std::perror("Error opening socket");
-		std::exit(EXIT_FAILURE);
-	}
-
-	int opt = 1;
-	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-	return fd;
-}
-
-void bind_and_listen(int fd) {
-	struct sockaddr_in addr;
-	std::memset(&addr, 0, sizeof(addr));
-
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons(8080);
-	addr.sin_addr.s_addr = INADDR_ANY;
-
-	if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
-		std::perror("Error binding socket");
-		std::exit(EXIT_FAILURE);
-	}
-
-	if (listen(fd, 1024) != 0) {
-		std::perror("Error listening");
-		std::exit(EXIT_FAILURE);
-	}
-}
-
-int accept_client(int fd) {
-	struct sockaddr_in client_addr;
-	socklen_t size = sizeof(client_addr);
-
-	int client_fd = accept(fd, (struct sockaddr*)&client_addr, &size);
-	if (client_fd < 0) {
-		std::perror("Error accepting");
-		std::exit(EXIT_FAILURE);
-	}
-	return client_fd;
-}
-
-void handle_client(int client_fd, std::string& buffer) {
-	ssize_t n;
-	char tmp[2048];
-	n = read(client_fd, tmp, sizeof(tmp));
-	buffer.append(tmp, n);
-	std::cout << buffer << std::endl;
-	return;
-}
 
 std::string extractKey(const std::string &userCommand){
 	size_t firstCRLF = userCommand.find("\r\n");
@@ -208,19 +159,20 @@ Method parseMethod(const std::string &userCommand){
 	for (auto& c : command)
 		c = std::toupper(static_cast<unsigned char>(c));
 
-	if (command == "PING") return Method::PING;
-	if (command == "SET") return Method::SET;
-	if (command == "GET") return Method::GET;
-	if (command == "DEL") return Method::DEL;
+	if (command == "PING")  return Method::PING;
+	if (command == "SET")   return Method::SET;
+	if (command == "GET")   return Method::GET;
+	if (command == "DEL")   return Method::DEL;
 	if (command == "CHECK") return Method::CHECK;
-	if (command == "INCR") return Method::INCR;
-	if (command == "DECR") return Method::DECR;
+	if (command == "INCR")  return Method::INCR;
+	if (command == "DECR")  return Method::DECR;
+	if (command == "LPUSH") return Method::LPUSH;
+	if (command == "RPUSH") return Method::RPUSH;
 	return Method::UNKNOWN;
 } 	
 
 
 
-//std::unique_ptr<ValueObject>
 void parseUserCommand(int client_fd, std::string &userCommand){ //checks for mehthod user requested
 	Method commandMethod = parseMethod(userCommand);
 	switch(commandMethod){

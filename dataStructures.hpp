@@ -20,7 +20,8 @@ enum class Method{
 	INCR,
 	DECR,
 	//List Methods
-	
+	LPUSH,
+	RPUSH,
 	UNKNOWN
 };
 
