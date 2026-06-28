@@ -30,6 +30,23 @@ std::string extractKey(const std::string &userCommand){
 	return key;
 }
 
+std::string extractVal(const std::string &userCommand){
+	//expected input
+	//SET\r\nALI\r\n20\r\n
+	size_t firstCRLF = userCommand.find("\r\n");
+	if(firstCRLF == std::string::npos) return std::string("Error");
+
+	size_t secondCRLF = userCommand.find("\r\n", firstCRLF + 2);
+	if(secondCRLF == std::string::npos) return std::string("Error");
+
+	size_t thirdCRLF = userCommand.find("\r\n", secondCRLF + 2);
+	if(thirdCRLF == std::string::npos) return std::string("Error");
+
+
+	std::string val = userCommand.substr(secondCRLF + 2, thirdCRLF - (secondCRLF + 2));
+	return val;
+}
+
 bool checkExists(const std::string &Key){
 	auto iter = storageMap.find(Key);
 	if (iter == storageMap.end()){
@@ -133,7 +150,7 @@ Code handleIncrement(const std::string &userCommand){
 	return Code::UNKNOWN;
 }
 
-Code handleDecrement(const std::string &userCommand){
+Code handleDecrement(const std::string& userCommand){
 	auto key = extractKey(userCommand);
 	auto val = searchMap(key);
 	if(auto* condition = std::get_if<std::string>(&val->second->value)){
@@ -151,7 +168,78 @@ Code handleDecrement(const std::string &userCommand){
 	} else {
 		return Code::ERROR;
 	}
-	return Code::UNKNOWN;}
+	return Code::UNKNOWN;
+}
+
+//LPUSH 
+Code handleLPush(const std::string& userCommand){
+	std::string key = extractKey(userCommand);
+	std::string userValue = extractVal(userCommand);
+	//check if list at key already exists
+	// if not then create and 'insert' else append
+	auto it = storageMap.find(key);
+	if(it == storageMap.end()){
+		std::deque<std::string> d;
+		d.push_front(userValue);
+		auto newObj = ValueObject(d);
+		storageMap.insert({key, std::make_unique<ValueObject>(newObj)});
+		return Code::SUCCESS;
+	}
+	else { //else we know a deque already exists at that key
+		std::get<std::deque<std::string>>(it->second->value).push_front(userValue);
+		return Code::SUCCESS;
+	}
+	return Code::ERROR;
+}
+
+Code handleRPush(const std::string& userCommand){
+	//same thing check if list at key exists but 'push_back'
+	std::string key = extractKey(userCommand);
+	std::string userValue = extractVal(userCommand);
+	//check if list at key already exists
+	// if not then create and 'insert' else append
+	auto it = storageMap.find(key);
+	if(it == storageMap.end()){
+		std::deque<std::string> d;
+		d.push_back(userValue);
+		auto newObj = ValueObject(d);
+		storageMap.insert({key, std::make_unique<ValueObject>(newObj)});
+		return Code::SUCCESS;
+	}
+	else { //else we know a deque already exists at that key
+		std::get<std::deque<std::string>>(it->second->value).push_back(userValue);
+		return Code::SUCCESS;
+	}
+	return Code::ERROR;
+}
+//pop_front
+Return handleLPop(const std::string& userCommand){
+	std::string key = extractKey(userCommand);
+	auto it = storageMap.find(key);
+	if(it == storageMap.end()){
+		std::cout << "LPOP Key Not Found" << std::endl;
+		return Return{Code::ERROR, std::string("")};
+	} else {
+		auto* d = &std::get<std::deque<std::string>>(it->second->value);
+		auto res = d->front();
+		d->pop_front();
+		return Return{Code::SUCCESS, res};
+	}
+}
+//pop_back
+Return handleRPop(const std::string& userCommand){
+	std::string key = extractKey(userCommand);
+	auto it = storageMap.find(key);
+	if(it == storageMap.end()){
+		std::cout << "RPOP Key Not Found" << std::endl;
+		return Return{Code::ERROR, std::string("")};
+	} else {
+		auto* d = &std::get<std::deque<std::string>>(it->second->value);
+		auto res = d->back();
+		d->pop_back();
+		return Return{Code::SUCCESS, res};
+	}
+}
 
 Method parseMethod(const std::string &userCommand){
 	auto firstCRLF = userCommand.find("\r\n");
@@ -168,6 +256,8 @@ Method parseMethod(const std::string &userCommand){
 	if (command == "DECR")  return Method::DECR;
 	if (command == "LPUSH") return Method::LPUSH;
 	if (command == "RPUSH") return Method::RPUSH;
+	if (command == "LPOP")  return Method::LPOP;
+	if (command == "RPOP")  return Method::RPOP;
 	return Method::UNKNOWN;
 } 	
 
@@ -222,6 +312,42 @@ void parseUserCommand(int client_fd, std::string &userCommand){ //checks for meh
 				write(client_fd, "Error Decrementing", strlen("Error Decrementing"));
 			}
 			break;
+		case Method::LPUSH:
+			if(handleLPush(userCommand) == Code::SUCCESS){
+				write(client_fd, "Pushed Value", strlen("Pushed Value"));
+			} else {
+
+				write(client_fd, "Error pushing value", strlen("Error pushing Value"));
+			}
+			break;
+		case Method::RPUSH:
+			if(handleRPush(userCommand) == Code::SUCCESS){
+				write(client_fd, "Pushed Value", strlen("Pushed Value"));
+			} else {
+
+				write(client_fd, "Error pushing value", strlen("Error pushing Value"));
+			}
+			break;		
+		case Method::LPOP: {
+			Return lpop_r = handleLPop(userCommand);
+			if(lpop_r.code == Code::SUCCESS){
+				std::string s = "Popped Value" + lpop_r.value;
+				write(client_fd, s.c_str() , s.size());
+			} else {
+				write(client_fd, "Error Popping Value", strlen("Error Popping Value"));
+			}
+			break;
+		}
+		case Method::RPOP: {
+			Return rpop_r = handleRPop(userCommand);
+			if(rpop_r.code == Code::SUCCESS){
+				std::string s = "Popped Value" + rpop_r.value;
+				write(client_fd, s.c_str() , s.size());
+			} else {
+				write(client_fd, "Error Popping Value", strlen("Error Popping Value"));
+			}
+			break;
+		}
 		default:
 			std::cout << "Text Received: " + userCommand << std::endl;
 			write(client_fd, "Not sure", strlen("Not sure"));

@@ -1,8 +1,10 @@
+#pragma once
 #include <string>
+#include <deque>
 #include <vector>
 #include <unordered_set>
 #include <variant>
-#pragma once
+
 
 enum class Code{
 	SUCCESS,
@@ -22,6 +24,8 @@ enum class Method{
 	//List Methods
 	LPUSH,
 	RPUSH,
+	LPOP,
+	RPOP,
 	UNKNOWN
 };
 
@@ -31,10 +35,15 @@ enum class ValueType{
 	SET
 };
 
+struct Return {
+	Code code;
+	std::string value;
+};
+
 class ValueObject{
 	public:
 		std::variant<std::string,
-			std::vector<std::string>, 
+			std::deque<std::string>, 
 			std::unordered_set<std::string>
 		> value;
 
